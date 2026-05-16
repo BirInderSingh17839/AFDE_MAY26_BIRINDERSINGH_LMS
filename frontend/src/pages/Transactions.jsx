@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { listBooks, listBorrowers, listTransactions, borrowBook, returnBook } from '../services/api';
 import { useToast } from '../components/Toast';
 
+const toneFor = (i) => `tone-${(i % 5) + 1}`;
+const initials = (name) => (name || '?').split(' ').map(s => s[0]).filter(Boolean).slice(0,2).join('').toUpperCase();
+
 export default function Transactions() {
   const [books, setBooks] = useState([]);
   const [borrowers, setBorrowers] = useState([]);
@@ -15,39 +18,26 @@ export default function Transactions() {
     setLoading(true);
     try {
       const [b, bo, t] = await Promise.all([listBooks(), listBorrowers(), listTransactions()]);
-      setBooks(b);
-      setBorrowers(bo);
-      setTxns(t);
-    } catch (e) {
-      show('Failed to load data', 'error');
-    } finally {
-      setLoading(false);
-    }
+      setBooks(b); setBorrowers(bo); setTxns(t);
+    } catch { show('Failed to load data', 'error'); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
 
   const onBorrow = async (e) => {
     e.preventDefault();
-    if (!bookId || !borrowerId) { show('Select a book and a borrower', 'error'); return; }
+    if (!bookId || !borrowerId) { show('Please select a book and a borrower', 'error'); return; }
     try {
       await borrowBook(Number(bookId), Number(borrowerId));
       show('Book borrowed successfully');
-      setBookId(''); setBorrowerId('');
-      load();
-    } catch (err) {
-      show(err?.response?.data?.detail || 'Borrow failed', 'error');
-    }
+      setBookId(''); setBorrowerId(''); load();
+    } catch (err) { show(err?.response?.data?.detail || 'Borrow failed', 'error'); }
   };
 
   const onReturn = async (txn) => {
-    try {
-      await returnBook(txn.transaction_id);
-      show('Book returned');
-      load();
-    } catch (err) {
-      show(err?.response?.data?.detail || 'Return failed', 'error');
-    }
+    try { await returnBook(txn.transaction_id); show('Book returned'); load(); }
+    catch (err) { show(err?.response?.data?.detail || 'Return failed', 'error'); }
   };
 
   const availableBooks = books.filter(b => b.availability_status === 'Available');
@@ -56,53 +46,58 @@ export default function Transactions() {
     <div>
       <div className="page-header">
         <div>
-          <div className="page-title">Borrow / Return</div>
-          <div className="page-subtitle">Lend books out and record returns.</div>
+          <div className="page-title">🔄 Borrow & Return</div>
+          <div className="page-subtitle">{txns.length} transaction{txns.length !== 1 ? 's' : ''} on record</div>
         </div>
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
-        <div className="card-title">Borrow a Book</div>
+        <div className="card-title">📤 Borrow a Book</div>
         <form onSubmit={onBorrow}>
           <div className="form-grid">
             <div className="form-row">
-              <label>Book (Available)</label>
+              <label>📚 Book (Available)</label>
               <select className="select" value={bookId} onChange={e => setBookId(e.target.value)}>
-                <option value="">-- Select a book --</option>
+                <option value="">— Select a book —</option>
                 {availableBooks.map(b => (
                   <option key={b.book_id} value={b.book_id}>{b.title} — {b.author}</option>
                 ))}
               </select>
             </div>
             <div className="form-row">
-              <label>Borrower</label>
+              <label>👤 Borrower</label>
               <select className="select" value={borrowerId} onChange={e => setBorrowerId(e.target.value)}>
-                <option value="">-- Select a borrower --</option>
+                <option value="">— Select a borrower —</option>
                 {borrowers.map(b => (
                   <option key={b.borrower_id} value={b.borrower_id}>{b.borrower_name} ({b.email})</option>
                 ))}
               </select>
             </div>
             <div className="form-row" style={{ justifyContent: 'flex-end' }}>
-              <label style={{ visibility: 'hidden' }}>Action</label>
+              <label style={{ visibility: 'hidden' }}>.</label>
               <button type="submit" className="btn btn-primary">📤 Borrow Book</button>
             </div>
           </div>
         </form>
       </div>
 
-      <div className="card">
-        <div className="card-title">All Transactions</div>
+      <div className="card" style={{ padding: 0 }}>
+        <div style={{ padding: '24px 24px 0' }}>
+          <div className="card-title">📜 All Transactions</div>
+        </div>
         {loading ? (
-          <div className="empty"><div className="emoji">⏳</div>Loading...</div>
+          <div className="empty"><span className="emoji">⏳</span>Loading...</div>
         ) : txns.length === 0 ? (
-          <div className="empty"><div className="emoji">📭</div>No transactions yet.</div>
+          <div className="empty">
+            <span className="emoji">📭</span>
+            <span className="title">No transactions yet</span>
+            Borrow a book above to record your first one.
+          </div>
         ) : (
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>#</th>
                   <th>Book</th>
                   <th>Borrower</th>
                   <th>Borrowed</th>
@@ -114,11 +109,15 @@ export default function Transactions() {
               <tbody>
                 {txns.map(t => (
                   <tr key={t.transaction_id}>
-                    <td>{t.transaction_id}</td>
                     <td><strong>{t.book_title || `Book #${t.book_id}`}</strong></td>
-                    <td>{t.borrower_name || `Borrower #${t.borrower_id}`}</td>
-                    <td>{new Date(t.borrow_date).toLocaleString()}</td>
-                    <td>{t.return_date ? new Date(t.return_date).toLocaleString() : '—'}</td>
+                    <td>
+                      <div className="cell-flex">
+                        <div className={`avatar ${toneFor(t.borrower_id ?? 0)}`}>{initials(t.borrower_name)}</div>
+                        <span>{t.borrower_name || `Borrower #${t.borrower_id}`}</span>
+                      </div>
+                    </td>
+                    <td className="text-dim">{new Date(t.borrow_date).toLocaleDateString()}</td>
+                    <td className="text-dim">{t.return_date ? new Date(t.return_date).toLocaleDateString() : '—'}</td>
                     <td>
                       {t.return_date
                         ? <span className="badge badge-success">Returned</span>

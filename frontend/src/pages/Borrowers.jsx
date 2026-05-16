@@ -4,6 +4,9 @@ import Modal from '../components/Modal';
 import BorrowerForm from '../components/BorrowerForm';
 import { useToast } from '../components/Toast';
 
+const toneFor = (i) => `tone-${(i % 5) + 1}`;
+const initials = (name) => (name || '?').split(' ').map(s => s[0]).filter(Boolean).slice(0,2).join('').toUpperCase();
+
 export default function Borrowers() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,43 +17,25 @@ export default function Borrowers() {
 
   const load = async () => {
     setLoading(true);
-    try {
-      setRows(await listBorrowers());
-    } catch (e) {
-      show('Failed to load borrowers', 'error');
-    } finally {
-      setLoading(false);
-    }
+    try { setRows(await listBorrowers()); }
+    catch { show('Failed to load borrowers', 'error'); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
 
   const onSubmit = async (form) => {
     try {
-      if (editing) {
-        await updateBorrower(editing.borrower_id, form);
-        show('Borrower updated');
-      } else {
-        await createBorrower(form);
-        show('Borrower added');
-      }
-      setOpenForm(false);
-      setEditing(null);
-      load();
-    } catch (e) {
-      show(e?.response?.data?.detail || 'Save failed', 'error');
-    }
+      if (editing) { await updateBorrower(editing.borrower_id, form); show('Borrower updated'); }
+      else         { await createBorrower(form);                      show('Borrower added'); }
+      setOpenForm(false); setEditing(null); load();
+    } catch (e) { show(e?.response?.data?.detail || 'Save failed', 'error'); }
   };
 
   const onDelete = async (b) => {
     if (!confirm(`Delete borrower "${b.borrower_name}"?`)) return;
-    try {
-      await deleteBorrower(b.borrower_id);
-      show('Borrower deleted');
-      load();
-    } catch (e) {
-      show(e?.response?.data?.detail || 'Delete failed', 'error');
-    }
+    try { await deleteBorrower(b.borrower_id); show('Borrower deleted'); load(); }
+    catch (e) { show(e?.response?.data?.detail || 'Delete failed', 'error'); }
   };
 
   const filtered = rows.filter(r => {
@@ -63,30 +48,34 @@ export default function Borrowers() {
     <div>
       <div className="page-header">
         <div>
-          <div className="page-title">Borrowers</div>
-          <div className="page-subtitle">Members registered with the library.</div>
+          <div className="page-title">👥 Borrowers</div>
+          <div className="page-subtitle">{rows.length} registered member{rows.length !== 1 ? 's' : ''}</div>
         </div>
         <button className="btn btn-primary" onClick={() => { setEditing(null); setOpenForm(true); }}>
-          ＋ Add Borrower
+          ✨ Add Borrower
         </button>
       </div>
 
-      <div className="search-bar mt-2" style={{ marginBottom: 18 }}>
+      <div className="search-bar" style={{ marginBottom: 20 }}>
         <span className="icon">🔍</span>
-        <input placeholder="Filter by name, email, or phone..." value={query} onChange={e => setQuery(e.target.value)} />
+        <input placeholder="Search by name, email, or phone..." value={query} onChange={e => setQuery(e.target.value)} />
+        {query && <button className="btn btn-ghost btn-sm" onClick={() => setQuery('')}>Clear</button>}
       </div>
 
-      <div className="card">
+      <div className="card" style={{ padding: 0 }}>
         {loading ? (
-          <div className="empty"><div className="emoji">⏳</div>Loading...</div>
+          <div className="empty"><span className="emoji">⏳</span>Loading borrowers...</div>
         ) : filtered.length === 0 ? (
-          <div className="empty"><div className="emoji">👥</div>No borrowers yet.</div>
+          <div className="empty">
+            <span className="emoji">👤</span>
+            <span className="title">{query ? 'No matches found' : 'No borrowers yet'}</span>
+            {query ? 'Try a different search.' : 'Add your first borrower to get started.'}
+          </div>
         ) : (
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>#</th>
                   <th>Name</th>
                   <th>Email</th>
                   <th>Phone</th>
@@ -96,10 +85,14 @@ export default function Borrowers() {
               <tbody>
                 {filtered.map(r => (
                   <tr key={r.borrower_id}>
-                    <td>{r.borrower_id}</td>
-                    <td><strong>{r.borrower_name}</strong></td>
-                    <td>{r.email}</td>
-                    <td>{r.phone}</td>
+                    <td>
+                      <div className="cell-flex">
+                        <div className={`avatar ${toneFor(r.borrower_id)}`}>{initials(r.borrower_name)}</div>
+                        <strong>{r.borrower_name}</strong>
+                      </div>
+                    </td>
+                    <td className="text-dim">{r.email}</td>
+                    <td className="text-dim">{r.phone}</td>
                     <td className="text-right">
                       <button className="btn btn-ghost btn-sm" onClick={() => { setEditing(r); setOpenForm(true); }}>Edit</button>
                       &nbsp;
@@ -113,7 +106,7 @@ export default function Borrowers() {
         )}
       </div>
 
-      <Modal open={openForm} title={editing ? 'Edit Borrower' : 'Add Borrower'} onClose={() => { setOpenForm(false); setEditing(null); }}>
+      <Modal open={openForm} title={editing ? '✏️ Edit Borrower' : '✨ Add Borrower'} onClose={() => { setOpenForm(false); setEditing(null); }}>
         <BorrowerForm initial={editing} onSubmit={onSubmit} onCancel={() => { setOpenForm(false); setEditing(null); }} />
       </Modal>
     </div>

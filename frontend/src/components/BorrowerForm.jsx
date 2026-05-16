@@ -32,24 +32,24 @@ export default function BorrowerForm({ initial, onSubmit, onCancel }) {
     <form onSubmit={submit}>
       <div className="form-grid">
         <div className="form-row">
-          <label>Full Name</label>
-          <input className="input" value={form.borrower_name} onChange={set('borrower_name')} placeholder="John Doe" />
+          <label>👤 Full Name</label>
+          <input className="input" value={form.borrower_name} onChange={set('borrower_name')} placeholder="Jane Doe" />
           {errors.borrower_name && <div className="error-text">{errors.borrower_name}</div>}
         </div>
         <div className="form-row">
-          <label>Email</label>
-          <input className="input" type="email" value={form.email} onChange={set('email')} placeholder="john@example.com" />
+          <label>📧 Email</label>
+          <input className="input" type="email" value={form.email} onChange={set('email')} placeholder="jane@example.com" />
           {errors.email && <div className="error-text">{errors.email}</div>}
         </div>
         <div className="form-row">
-          <label>Phone</label>
+          <label>📱 Phone</label>
           <input className="input" value={form.phone} onChange={set('phone')} placeholder="+91-9876500000" />
           {errors.phone && <div className="error-text">{errors.phone}</div>}
         </div>
       </div>
       <div className="modal-actions">
         <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancel</button>
-        <button type="submit" className="btn btn-primary">Save Borrower</button>
+        <button type="submit" className="btn btn-primary">💾 Save Borrower</button>
       </div>
     </form>
   );

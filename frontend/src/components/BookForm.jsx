@@ -32,27 +32,27 @@ export default function BookForm({ initial, onSubmit, onCancel }) {
     <form onSubmit={submit}>
       <div className="form-grid">
         <div className="form-row">
-          <label>Title</label>
-          <input className="input" value={form.title} onChange={set('title')} placeholder="Book title" />
+          <label>📖 Title</label>
+          <input className="input" value={form.title} onChange={set('title')} placeholder="The Pragmatic Programmer" />
           {errors.title && <div className="error-text">{errors.title}</div>}
         </div>
         <div className="form-row">
-          <label>Author</label>
-          <input className="input" value={form.author} onChange={set('author')} placeholder="Author name" />
+          <label>✍️ Author</label>
+          <input className="input" value={form.author} onChange={set('author')} placeholder="Andrew Hunt" />
           {errors.author && <div className="error-text">{errors.author}</div>}
         </div>
         <div className="form-row">
-          <label>Category</label>
-          <input className="input" value={form.category} onChange={set('category')} placeholder="e.g. Fiction" />
+          <label>🏷️ Category</label>
+          <input className="input" value={form.category} onChange={set('category')} placeholder="Programming" />
           {errors.category && <div className="error-text">{errors.category}</div>}
         </div>
         <div className="form-row">
-          <label>ISBN</label>
+          <label>🔢 ISBN</label>
           <input className="input" value={form.isbn} onChange={set('isbn')} placeholder="978-..." />
           {errors.isbn && <div className="error-text">{errors.isbn}</div>}
         </div>
         <div className="form-row">
-          <label>Availability</label>
+          <label>📊 Status</label>
           <select className="select" value={form.availability_status} onChange={set('availability_status')}>
             <option value="Available">Available</option>
             <option value="Borrowed">Borrowed</option>
@@ -61,7 +61,7 @@ export default function BookForm({ initial, onSubmit, onCancel }) {
       </div>
       <div className="modal-actions">
         <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancel</button>
-        <button type="submit" className="btn btn-primary">Save Book</button>
+        <button type="submit" className="btn btn-primary">💾 Save Book</button>
       </div>
     </form>
   );

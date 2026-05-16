@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { searchBooks } from '../services/api';
 import { useToast } from '../components/Toast';
 
+const categoryColors = ['badge-info', 'badge-teal', 'badge-pink', 'badge-blue', 'badge-warning'];
+const colorFor = (s) => categoryColors[(s?.length || 0) % categoryColors.length];
+
 export default function Search() {
   const [q, setQ] = useState('');
   const [title, setTitle] = useState('');
@@ -17,18 +20,14 @@ export default function Search() {
     setLoading(true);
     try {
       const params = {};
-      if (q) params.q = q;
-      if (title) params.title = title;
-      if (author) params.author = author;
+      if (q)        params.q = q;
+      if (title)    params.title = title;
+      if (author)   params.author = author;
       if (category) params.category = category;
-      const data = await searchBooks(params);
-      setResults(data);
+      setResults(await searchBooks(params));
       setSearched(true);
-    } catch (err) {
-      show('Search failed', 'error');
-    } finally {
-      setLoading(false);
-    }
+    } catch { show('Search failed', 'error'); }
+    finally { setLoading(false); }
   };
 
   const reset = () => {
@@ -40,54 +39,69 @@ export default function Search() {
     <div>
       <div className="page-header">
         <div>
-          <div className="page-title">Search Books</div>
-          <div className="page-subtitle">Find books by keyword or filter by specific fields.</div>
+          <div className="page-title">🔍 Search Books</div>
+          <div className="page-subtitle">Find books by keyword or specific filters</div>
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 18 }}>
+      <div className="card" style={{ marginBottom: 20 }}>
         <form onSubmit={run}>
-          <div className="search-bar" style={{ boxShadow: 'none', border: '1px solid var(--border)' }}>
+          <div className="search-bar" style={{ boxShadow: 'none' }}>
             <span className="icon">🔍</span>
-            <input placeholder="Keyword search across title, author, category, ISBN..." value={q} onChange={e => setQ(e.target.value)} />
+            <input placeholder="Keyword search: title, author, category, ISBN..." value={q} onChange={e => setQ(e.target.value)} />
           </div>
 
-          <div className="form-grid mt-4">
+          <div className="form-grid" style={{ marginTop: 18 }}>
             <div className="form-row">
-              <label>Title</label>
+              <label>📖 Title</label>
               <input className="input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Filter by title" />
             </div>
             <div className="form-row">
-              <label>Author</label>
+              <label>✍️ Author</label>
               <input className="input" value={author} onChange={e => setAuthor(e.target.value)} placeholder="Filter by author" />
             </div>
             <div className="form-row">
-              <label>Category</label>
-              <input className="input" value={category} onChange={e => setCategory(e.target.value)} placeholder="Filter by category" />
+              <label>🏷️ Category</label>
+              <input className="input" value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g. Fiction" />
             </div>
           </div>
 
-          <div className="flex gap-2 mt-4">
+          <div className="flex gap-3" style={{ marginTop: 18 }}>
             <button type="submit" className="btn btn-primary">🔎 Search</button>
             <button type="button" className="btn btn-ghost" onClick={reset}>Reset</button>
           </div>
         </form>
       </div>
 
-      <div className="card">
-        <div className="card-title">Results {searched && `(${results.length})`}</div>
+      <div className="card" style={{ padding: 0 }}>
+        <div style={{ padding: '24px 24px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="card-title" style={{ marginBottom: 0 }}>
+            Results
+          </div>
+          {searched && (
+            <span className="badge badge-info">{results.length} found</span>
+          )}
+        </div>
+
         {loading ? (
-          <div className="empty"><div className="emoji">⏳</div>Searching...</div>
+          <div className="empty"><span className="emoji">⏳</span>Searching...</div>
         ) : !searched ? (
-          <div className="empty"><div className="emoji">📖</div>Enter a search term above to find books.</div>
+          <div className="empty">
+            <span className="emoji">📖</span>
+            <span className="title">Ready when you are</span>
+            Enter a search term above to find books.
+          </div>
         ) : results.length === 0 ? (
-          <div className="empty"><div className="emoji">🤔</div>No books matched your query.</div>
+          <div className="empty">
+            <span className="emoji">🤔</span>
+            <span className="title">No matches</span>
+            Try different keywords or fewer filters.
+          </div>
         ) : (
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>#</th>
                   <th>Title</th>
                   <th>Author</th>
                   <th>Category</th>
@@ -98,11 +112,10 @@ export default function Search() {
               <tbody>
                 {results.map(b => (
                   <tr key={b.book_id}>
-                    <td>{b.book_id}</td>
                     <td><strong>{b.title}</strong></td>
                     <td>{b.author}</td>
-                    <td><span className="badge badge-info">{b.category}</span></td>
-                    <td className="text-muted">{b.isbn}</td>
+                    <td><span className={`badge ${colorFor(b.category)}`}>{b.category}</span></td>
+                    <td className="text-dim" style={{ fontSize: 12 }}>{b.isbn}</td>
                     <td>
                       {b.availability_status === 'Available'
                         ? <span className="badge badge-success">Available</span>

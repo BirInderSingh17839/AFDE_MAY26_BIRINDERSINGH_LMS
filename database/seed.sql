@@ -1,9 +1,11 @@
 -- =====================================================================
--- Library Management System — Seed Data
+-- Library Management System — Seed Data (SQLite)
 -- =====================================================================
--- Loads a starter catalog and a few borrowers so the UI looks alive.
--- Run after schema.sql:
---   psql -d library_db -f seed.sql
+-- Run after schema.sql to populate a starter catalog and sample users.
+--   sqlite3 backend/library.db < database/seed.sql
+--
+-- Note: when the FastAPI app starts, it auto-creates an `admin` user with
+-- password `admin123` only if the users table is empty (see backend/main.py).
 -- =====================================================================
 
 INSERT INTO books (title, author, category, isbn, availability_status) VALUES

@@ -1,7 +1,18 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 sqlalchemy==2.0.34
-psycopg2-binary==2.9.9
 pydantic==2.9.2
 pydantic[email]==2.9.2
 python-multipart==0.0.9
+# ---- Auth (Phase 2: JWT) ----
+PyJWT==2.9.0
+passlib[bcrypt]==1.7.4
+# bcrypt must stay on 4.0.x — passlib 1.7.4 reads bcrypt.__about__
+# which was removed in bcrypt 4.1+. Login crashes if upgraded.
+bcrypt==4.0.1
+# ---- ETL + Reports (Phase 2) ----
+pandas==2.2.2
+openpyxl==3.1.5
+reportlab==4.2.5
+# ---- Optional: PostgreSQL ----
+# psycopg2-binary==2.9.9

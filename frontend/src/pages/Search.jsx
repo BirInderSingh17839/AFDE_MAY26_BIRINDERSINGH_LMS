@@ -1,133 +1,133 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Search as SearchIcon, BookOpen, Sparkles } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
+import Skeleton from '../components/Skeleton';
 import { searchBooks } from '../services/api';
-import { useToast } from '../components/Toast';
+import { useToast } from '../contexts/ToastContext';
 
-const categoryColors = ['badge-info', 'badge-teal', 'badge-pink', 'badge-blue', 'badge-warning'];
-const colorFor = (s) => categoryColors[(s?.length || 0) % categoryColors.length];
-
-export default function Search() {
-  const [q, setQ] = useState('');
-  const [title, setTitle] = useState('');
-  const [author, setAuthor] = useState('');
-  const [category, setCategory] = useState('');
+export default function SearchPage() {
+  const [q, setQ]            = useState('');
   const [results, setResults] = useState([]);
-  const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { show } = useToast();
+  const [searched, setSearched] = useState(false);
+  const [filters, setFilters] = useState({ title: '', author: '', category: '' });
+  const debounceRef = useRef(null);
+  const toast = useToast();
 
-  const run = async (e) => {
-    e?.preventDefault();
+  const run = async (params) => {
     setLoading(true);
     try {
-      const params = {};
-      if (q)        params.q = q;
-      if (title)    params.title = title;
-      if (author)   params.author = author;
-      if (category) params.category = category;
-      setResults(await searchBooks(params));
+      const data = await searchBooks(params);
+      setResults(data);
       setSearched(true);
-    } catch { show('Search failed', 'error'); }
-    finally { setLoading(false); }
+    } catch (e) {
+      toast.error(e.userMessage || 'Search failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const reset = () => {
-    setQ(''); setTitle(''); setAuthor(''); setCategory('');
-    setResults([]); setSearched(false);
+  // Debounced live search
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!q && !filters.title && !filters.author && !filters.category) {
+      setResults([]); setSearched(false);
+      return;
+    }
+    debounceRef.current = setTimeout(() => {
+      run({ q: q || undefined, ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)) });
+    }, 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [q, filters]);
+
+  const statusBadge = (s) => {
+    if (s === 'Available') return <span className="badge badge-success badge-dot">{s}</span>;
+    if (s === 'Borrowed')  return <span className="badge badge-warning badge-dot">{s}</span>;
+    return <span className="badge badge-muted">{s}</span>;
   };
 
   return (
-    <div>
-      <div className="page-header">
-        <div>
-          <div className="page-title">🔍 Search Books</div>
-          <div className="page-subtitle">Find books by keyword or specific filters</div>
+    <div className="space-y-6">
+      <PageHeader title="Search the Catalog" subtitle="Find books by title, author, category, or ISBN." icon={SearchIcon} />
+
+      {/* Hero search */}
+      <div className="card card-body">
+        <div className="relative">
+          <SearchIcon className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search for a book…"
+            className="w-full pl-12 pr-4 py-4 text-lg rounded-xl bg-slate-50 dark:bg-slate-800
+                       border border-slate-200 dark:border-slate-700
+                       focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500
+                       text-slate-900 dark:text-white"
+          />
+        </div>
+        <div className="grid sm:grid-cols-3 gap-3 mt-4">
+          <input
+            className="input" placeholder="Filter by title"
+            value={filters.title} onChange={(e) => setFilters({ ...filters, title: e.target.value })}
+          />
+          <input
+            className="input" placeholder="Filter by author"
+            value={filters.author} onChange={(e) => setFilters({ ...filters, author: e.target.value })}
+          />
+          <input
+            className="input" placeholder="Filter by category"
+            value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}
+          />
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 20 }}>
-        <form onSubmit={run}>
-          <div className="search-bar" style={{ boxShadow: 'none' }}>
-            <span className="icon">🔍</span>
-            <input placeholder="Keyword search: title, author, category, ISBN..." value={q} onChange={e => setQ(e.target.value)} />
-          </div>
-
-          <div className="form-grid" style={{ marginTop: 18 }}>
-            <div className="form-row">
-              <label>📖 Title</label>
-              <input className="input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Filter by title" />
-            </div>
-            <div className="form-row">
-              <label>✍️ Author</label>
-              <input className="input" value={author} onChange={e => setAuthor(e.target.value)} placeholder="Filter by author" />
-            </div>
-            <div className="form-row">
-              <label>🏷️ Category</label>
-              <input className="input" value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g. Fiction" />
-            </div>
-          </div>
-
-          <div className="flex gap-3" style={{ marginTop: 18 }}>
-            <button type="submit" className="btn btn-primary">🔎 Search</button>
-            <button type="button" className="btn btn-ghost" onClick={reset}>Reset</button>
-          </div>
-        </form>
-      </div>
-
-      <div className="card" style={{ padding: 0 }}>
-        <div style={{ padding: '24px 24px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div className="card-title" style={{ marginBottom: 0 }}>
-            Results
-          </div>
-          {searched && (
-            <span className="badge badge-info">{results.length} found</span>
-          )}
+      {/* Results */}
+      {!searched && !loading ? (
+        <div className="card card-body text-center py-16">
+          <Sparkles className="w-10 h-10 mx-auto text-brand-500" />
+          <h3 className="mt-3 font-semibold text-slate-900 dark:text-white">Start typing to search</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Try titles, authors, categories, or ISBNs.
+          </p>
         </div>
-
-        {loading ? (
-          <div className="empty"><span className="emoji">⏳</span>Searching...</div>
-        ) : !searched ? (
-          <div className="empty">
-            <span className="emoji">📖</span>
-            <span className="title">Ready when you are</span>
-            Enter a search term above to find books.
+      ) : loading ? (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="card card-body space-y-3">
+              <Skeleton className="h-5 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-4 w-2/3" />
+            </div>
+          ))}
+        </div>
+      ) : results.length === 0 ? (
+        <div className="card card-body text-center py-16">
+          <BookOpen className="w-10 h-10 mx-auto text-slate-400" />
+          <h3 className="mt-3 font-semibold text-slate-900 dark:text-white">No results</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Try a different keyword.</p>
+        </div>
+      ) : (
+        <>
+          <div className="text-sm text-slate-500 dark:text-slate-400">
+            <strong className="text-slate-700 dark:text-slate-300">{results.length}</strong> result(s)
           </div>
-        ) : results.length === 0 ? (
-          <div className="empty">
-            <span className="emoji">🤔</span>
-            <span className="title">No matches</span>
-            Try different keywords or fewer filters.
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {results.map((b) => (
+              <div key={b.book_id} className="card card-body hover:-translate-y-0.5 transition-transform">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-semibold text-slate-900 dark:text-white">{b.title}</h3>
+                  {statusBadge(b.availability_status)}
+                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{b.author}</p>
+                <div className="flex items-center gap-2 mt-3 text-xs">
+                  <span className="badge badge-info">{b.category}</span>
+                  <span className="text-slate-500 dark:text-slate-400">ISBN {b.isbn}</span>
+                </div>
+              </div>
+            ))}
           </div>
-        ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Author</th>
-                  <th>Category</th>
-                  <th>ISBN</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map(b => (
-                  <tr key={b.book_id}>
-                    <td><strong>{b.title}</strong></td>
-                    <td>{b.author}</td>
-                    <td><span className={`badge ${colorFor(b.category)}`}>{b.category}</span></td>
-                    <td className="text-dim" style={{ fontSize: 12 }}>{b.isbn}</td>
-                    <td>
-                      {b.availability_status === 'Available'
-                        ? <span className="badge badge-success">Available</span>
-                        : <span className="badge badge-warning">Borrowed</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }

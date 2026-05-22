@@ -1,173 +1,151 @@
-# API Documentation — Library Management System
+# API Documentation — LibraryOS v2
 
 Base URL: `http://localhost:8000`
 Interactive docs: `http://localhost:8000/docs` (Swagger UI) and `/redoc`.
 
-All requests/responses use `application/json`.
+All requests/responses use `application/json` except CSV exports.
+
+> **Authentication.** Most endpoints require an active session. Call
+> `POST /auth/login` first; the server sets a signed cookie
+> (`lms_session`) which the browser sends back automatically when the
+> Axios client is configured with `withCredentials: true`.
 
 ---
 
 ## Health
 
-### `GET /`
-```json
-{
-  "app": "Library Management System",
-  "status": "ok",
-  "docs": "/docs"
-}
-```
+| Method | Path        | Auth | Description                       |
+|--------|-------------|------|-----------------------------------|
+| GET    | `/`         | none | Root status + version             |
+| GET    | `/health`   | none | Lightweight DB ping               |
 
-## Dashboard
+---
 
-### `GET /dashboard`
-```json
-{
-  "total_books": 10,
-  "available_books": 9,
-  "borrowed_books": 1,
-  "total_borrowers": 4,
-  "total_transactions": 1
-}
-```
+## Authentication
+
+| Method | Path                       | Auth   | Body                                                  | Description                                              |
+|--------|----------------------------|--------|-------------------------------------------------------|----------------------------------------------------------|
+| POST   | `/auth/register`           | public | `{ username, email, full_name, password, role? }`     | Create account. **The very first user is forced to `admin`.** Subsequent users default to `student`. |
+| POST   | `/auth/login`              | public | `{ username, password }`                              | Logs in and sets the session cookie. Returns the user.   |
+| POST   | `/auth/logout`             | any    | —                                                     | Clears the session cookie.                               |
+| GET    | `/auth/me`                 | any    | —                                                     | Returns the current user.                                |
+| POST   | `/auth/change-password`    | any    | `{ old_password, new_password }`                      | Verifies the old password before updating.               |
+
+---
+
+## Users (admin only)
+
+| Method | Path                                       | Body              | Description                          |
+|--------|--------------------------------------------|-------------------|--------------------------------------|
+| GET    | `/users/`                                  | —                 | List all users.                      |
+| PUT    | `/users/{user_id}`                         | partial user      | Update role, full_name, email, active|
+| DELETE | `/users/{user_id}`                         | —                 | Delete user (cannot delete self).    |
+| PUT    | `/users/{user_id}/link-borrower/{borrower_id}` | —             | Link a student account to a member.  |
 
 ---
 
 ## Books
 
-### `GET /books`
-Returns an array of book objects.
-```json
-[
-  {
-    "book_id": 1,
-    "title": "Clean Code",
-    "author": "Robert C. Martin",
-    "category": "Programming",
-    "isbn": "978-0132350884",
-    "availability_status": "Available"
-  }
-]
-```
-
-### `GET /books/{book_id}`
-Returns a single book or `404`.
-
-### `POST /books`
-Request body:
-```json
-{
-  "title": "The Pragmatic Programmer",
-  "author": "Andrew Hunt",
-  "category": "Programming",
-  "isbn": "978-0201616224",
-  "availability_status": "Available"
-}
-```
-Response: `201` with created book.
-Errors: `400` if ISBN already exists.
-
-### `PUT /books/{book_id}`
-All fields optional — only provided ones are updated.
-```json
-{ "category": "Software Engineering" }
-```
-
-### `DELETE /books/{book_id}`
-```json
-{ "detail": "Book deleted successfully" }
-```
+| Method | Path                  | Auth                | Body                                                              |
+|--------|-----------------------|---------------------|-------------------------------------------------------------------|
+| GET    | `/books/`             | any                 | —                                                                 |
+| GET    | `/books/{book_id}`    | any                 | —                                                                 |
+| POST   | `/books/`             | admin / librarian   | `{ title, author, category, isbn, availability_status? }`        |
+| PUT    | `/books/{book_id}`    | admin / librarian   | partial book                                                      |
+| DELETE | `/books/{book_id}`    | admin / librarian   | —                                                                 |
 
 ---
 
 ## Borrowers
 
-### `GET /borrowers`
-```json
-[
-  {
-    "borrower_id": 1,
-    "borrower_name": "Aarav Sharma",
-    "email": "aarav.sharma@example.com",
-    "phone": "+91-9876500001"
-  }
-]
-```
-
-### `POST /borrowers`
-```json
-{
-  "borrower_name": "Priya Patel",
-  "email": "priya.patel@example.com",
-  "phone": "+91-9876500002"
-}
-```
-
-### `PUT /borrowers/{id}` / `DELETE /borrowers/{id}`
-Standard update / delete semantics.
+| Method | Path                          | Auth                | Body                                |
+|--------|-------------------------------|---------------------|-------------------------------------|
+| GET    | `/borrowers/`                 | any                 | —                                   |
+| GET    | `/borrowers/{borrower_id}`    | any                 | —                                   |
+| POST   | `/borrowers/`                 | admin / librarian   | `{ borrower_name, email, phone }`  |
+| PUT    | `/borrowers/{borrower_id}`    | admin / librarian   | partial borrower                    |
+| DELETE | `/borrowers/{borrower_id}`    | admin / librarian   | —                                   |
 
 ---
 
-## Borrow / Return
+## Transactions (borrow / return / list)
 
-### `POST /borrow`
-Request:
-```json
-{ "book_id": 1, "borrower_id": 2 }
-```
-Response (201):
-```json
-{
-  "transaction_id": 1,
-  "book_id": 1,
-  "borrower_id": 2,
-  "borrow_date": "2026-05-16T10:30:00",
-  "return_date": null,
-  "book_title": "Clean Code",
-  "borrower_name": "Priya Patel"
-}
-```
-Errors:
-- `400` Book not available
-- `400` Book / borrower not found
+| Method | Path             | Auth                | Body                                                 |
+|--------|------------------|---------------------|------------------------------------------------------|
+| POST   | `/borrow`        | admin / librarian   | `{ book_id, borrower_id, loan_days? }`              |
+| POST   | `/return`        | admin / librarian   | `{ transaction_id }` — auto-creates a Fine if late  |
+| GET    | `/transactions`  | any (students see only their own) | query `?borrower_id=&skip=&limit=` |
 
-### `POST /return`
-Request:
-```json
-{ "transaction_id": 1 }
-```
-Response: transaction object with `return_date` populated and book marked `Available`.
-
-### `GET /transactions`
-Returns array of transaction objects (most recent first).
+The Transaction response includes a computed `is_overdue` flag.
 
 ---
 
 ## Search
 
-### `GET /search`
-Query parameters (all optional, combine freely):
-
-| Param      | Description                                       |
-|------------|---------------------------------------------------|
-| `q`        | Keyword across title, author, category, ISBN      |
-| `title`    | Substring match on title                          |
-| `author`   | Substring match on author                         |
-| `category` | Substring match on category                       |
-
-Examples:
-- `GET /search?q=clean`
-- `GET /search?author=Martin&category=Programming`
-- `GET /search?title=1984`
-
-Response: array of `BookOut` objects.
+| Method | Path     | Auth | Query                                          |
+|--------|----------|------|------------------------------------------------|
+| GET    | `/search`| any  | `q`, `title`, `author`, `category` (all optional, combined with AND) |
 
 ---
 
-## Error Format
+## Fines
 
-FastAPI returns errors in the standard form:
-```json
-{ "detail": "Book not found" }
+| Method | Path                       | Auth                                      | Body / Query                |
+|--------|----------------------------|-------------------------------------------|-----------------------------|
+| GET    | `/fines/`                  | any (students see own only)               | `?status=unpaid|paid|waived&borrower_id=` |
+| POST   | `/fines/pay`               | any (students can pay their own)          | `{ fine_id }`               |
+| POST   | `/fines/{fine_id}/waive`   | admin / librarian                         | —                           |
+
+Fine math (configurable in `.env`):
+
 ```
-HTTP status codes follow REST conventions (`200`, `201`, `400`, `404`, `422`).
+fine_amount = max(0, (return_date − due_date) in days) × FINE_PER_DAY
+```
+
+The Fine is created automatically by the `POST /return` endpoint when a return is past due.
+
+---
+
+## Notifications
+
+| Method | Path                            | Auth | Description                            |
+|--------|---------------------------------|------|----------------------------------------|
+| GET    | `/notifications/`               | any  | List own notifications. `?unread_only=true` |
+| GET    | `/notifications/unread-count`   | any  | `{ count }`                            |
+| POST   | `/notifications/{id}/read`      | any  | Mark a single one as read              |
+| POST   | `/notifications/read-all`       | any  | Bulk-read all of the current user's    |
+
+Categories: `info`, `success`, `warning`, `overdue`, `fine`.
+
+The backend emits notifications automatically on book issue and on fine creation; additional events can be added in `crud._notify`.
+
+---
+
+## Reports
+
+| Method | Path                          | Auth                | Notes                              |
+|--------|-------------------------------|---------------------|------------------------------------|
+| GET    | `/reports/summary`            | admin / librarian   | `{ by_category, monthly_activity, top_borrowers, most_borrowed_books }` |
+| GET    | `/reports/books.csv`          | admin / librarian   | CSV download                       |
+| GET    | `/reports/transactions.csv`   | admin / librarian   | CSV download                       |
+| GET    | `/reports/fines.csv`          | admin / librarian   | CSV download                       |
+
+---
+
+## Dashboard
+
+| Method | Path         | Auth | Response                                                                                                  |
+|--------|--------------|------|-----------------------------------------------------------------------------------------------------------|
+| GET    | `/dashboard` | any  | `{ total_books, available_books, borrowed_books, overdue_books, total_borrowers, total_users, active_users, total_transactions, total_fines_collected, total_fines_outstanding }` |
+
+---
+
+## Error format
+
+All errors follow FastAPI's standard:
+
+```json
+{ "detail": "Human-readable error message" }
+```
+
+HTTP codes used: `400` validation, `401` unauthenticated, `403` insufficient role, `404` not found, `500` server error.

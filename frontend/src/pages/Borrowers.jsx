@@ -1,113 +1,126 @@
 import { useEffect, useState } from 'react';
-import { listBorrowers, createBorrower, updateBorrower, deleteBorrower } from '../services/api';
+import { Users, Plus, Pencil, Trash2 } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
+import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import BorrowerForm from '../components/BorrowerForm';
-import { useToast } from '../components/Toast';
+import { listBorrowers, createBorrower, updateBorrower, deleteBorrower } from '../services/api';
+import { useToast } from '../contexts/ToastContext';
 
-const toneFor = (i) => `tone-${(i % 5) + 1}`;
-const initials = (name) => (name || '?').split(' ').map(s => s[0]).filter(Boolean).slice(0,2).join('').toUpperCase();
+const initials = (n) => (n || '?').split(' ').map((s) => s[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+const gradients = [
+  'from-brand-500 to-brand-700',
+  'from-emerald-500 to-teal-700',
+  'from-amber-500 to-orange-700',
+  'from-rose-500 to-fuchsia-700',
+  'from-violet-500 to-indigo-700',
+];
 
 export default function Borrowers() {
-  const [rows, setRows] = useState([]);
+  const [rows, setRows]       = useState([]);
   const [loading, setLoading] = useState(true);
-  const [openForm, setOpenForm] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [query, setQuery] = useState('');
-  const { show } = useToast();
+  const [modal, setModal]     = useState(null);
+  const [busy, setBusy]       = useState(false);
+  const toast = useToast();
 
   const load = async () => {
     setLoading(true);
     try { setRows(await listBorrowers()); }
-    catch { show('Failed to load borrowers', 'error'); }
+    catch (e) { toast.error(e.userMessage || 'Failed to load borrowers'); }
     finally { setLoading(false); }
   };
-
   useEffect(() => { load(); }, []);
 
-  const onSubmit = async (form) => {
+  const handleSubmit = async (data) => {
+    setBusy(true);
     try {
-      if (editing) { await updateBorrower(editing.borrower_id, form); show('Borrower updated'); }
-      else         { await createBorrower(form);                      show('Borrower added'); }
-      setOpenForm(false); setEditing(null); load();
-    } catch (e) { show(e?.response?.data?.detail || 'Save failed', 'error'); }
+      if (modal === 'create') {
+        await createBorrower(data);
+        toast.success('Borrower added');
+      } else {
+        await updateBorrower(modal.borrower_id, data);
+        toast.success('Borrower updated');
+      }
+      setModal(null);
+      load();
+    } catch (e) {
+      toast.error(e.userMessage || 'Could not save borrower');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const onDelete = async (b) => {
-    if (!confirm(`Delete borrower "${b.borrower_name}"?`)) return;
-    try { await deleteBorrower(b.borrower_id); show('Borrower deleted'); load(); }
-    catch (e) { show(e?.response?.data?.detail || 'Delete failed', 'error'); }
+  const handleDelete = async (b) => {
+    if (!confirm(`Delete borrower "${b.borrower_name}"? Their transactions will also be removed.`)) return;
+    try {
+      await deleteBorrower(b.borrower_id);
+      toast.success('Borrower deleted');
+      load();
+    } catch (e) {
+      toast.error(e.userMessage || 'Could not delete borrower');
+    }
   };
 
-  const filtered = rows.filter(r => {
-    if (!query) return true;
-    const q = query.toLowerCase();
-    return [r.borrower_name, r.email, r.phone].some(v => v?.toLowerCase().includes(q));
-  });
+  const columns = [
+    { key: 'borrower_id', label: 'ID' },
+    {
+      key: 'borrower_name', label: 'Name',
+      render: (b) => (
+        <div className="flex items-center gap-3">
+          <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${gradients[b.borrower_id % gradients.length]}
+                          text-white grid place-items-center text-xs font-bold`}>
+            {initials(b.borrower_name)}
+          </div>
+          <span className="font-medium text-slate-900 dark:text-white">{b.borrower_name}</span>
+        </div>
+      ),
+    },
+    { key: 'email', label: 'Email' },
+    { key: 'phone', label: 'Phone' },
+    {
+      key: '_actions', label: 'Actions', sortable: false, exportFn: () => '',
+      render: (b) => (
+        <div className="flex items-center gap-1">
+          <button className="btn btn-icon btn-ghost" onClick={() => setModal(b)} aria-label="Edit"><Pencil className="w-4 h-4" /></button>
+          <button className="btn btn-icon btn-ghost text-rose-600" onClick={() => handleDelete(b)} aria-label="Delete"><Trash2 className="w-4 h-4" /></button>
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div>
-      <div className="page-header">
-        <div>
-          <div className="page-title">👥 Borrowers</div>
-          <div className="page-subtitle">{rows.length} registered member{rows.length !== 1 ? 's' : ''}</div>
-        </div>
-        <button className="btn btn-primary" onClick={() => { setEditing(null); setOpenForm(true); }}>
-          ✨ Add Borrower
-        </button>
-      </div>
-
-      <div className="search-bar" style={{ marginBottom: 20 }}>
-        <span className="icon">🔍</span>
-        <input placeholder="Search by name, email, or phone..." value={query} onChange={e => setQuery(e.target.value)} />
-        {query && <button className="btn btn-ghost btn-sm" onClick={() => setQuery('')}>Clear</button>}
-      </div>
-
-      <div className="card" style={{ padding: 0 }}>
-        {loading ? (
-          <div className="empty"><span className="emoji">⏳</span>Loading borrowers...</div>
-        ) : filtered.length === 0 ? (
-          <div className="empty">
-            <span className="emoji">👤</span>
-            <span className="title">{query ? 'No matches found' : 'No borrowers yet'}</span>
-            {query ? 'Try a different search.' : 'Add your first borrower to get started.'}
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                  <th className="text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(r => (
-                  <tr key={r.borrower_id}>
-                    <td>
-                      <div className="cell-flex">
-                        <div className={`avatar ${toneFor(r.borrower_id)}`}>{initials(r.borrower_name)}</div>
-                        <strong>{r.borrower_name}</strong>
-                      </div>
-                    </td>
-                    <td className="text-dim">{r.email}</td>
-                    <td className="text-dim">{r.phone}</td>
-                    <td className="text-right">
-                      <button className="btn btn-ghost btn-sm" onClick={() => { setEditing(r); setOpenForm(true); }}>Edit</button>
-                      &nbsp;
-                      <button className="btn btn-danger btn-sm" onClick={() => onDelete(r)}>Delete</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Borrowers"
+        subtitle="Manage library members."
+        icon={Users}
+        actions={(
+          <button onClick={() => setModal('create')} className="btn btn-primary">
+            <Plus className="w-4 h-4" /> Add Borrower
+          </button>
         )}
-      </div>
+      />
 
-      <Modal open={openForm} title={editing ? '✏️ Edit Borrower' : '✨ Add Borrower'} onClose={() => { setOpenForm(false); setEditing(null); }}>
-        <BorrowerForm initial={editing} onSubmit={onSubmit} onCancel={() => { setOpenForm(false); setEditing(null); }} />
+      <DataTable
+        columns={columns}
+        rows={rows}
+        loading={loading}
+        exportName="borrowers"
+        searchKeys={['borrower_name', 'email', 'phone']}
+        empty="No borrowers yet."
+      />
+
+      <Modal
+        open={!!modal}
+        onClose={() => setModal(null)}
+        title={modal === 'create' ? 'Add a borrower' : 'Edit borrower'}
+      >
+        <BorrowerForm
+          initial={modal === 'create' ? null : modal}
+          onSubmit={handleSubmit}
+          onCancel={() => setModal(null)}
+          busy={busy}
+        />
       </Modal>
     </div>
   );

@@ -1,67 +1,67 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
-const empty = { title: '', author: '', category: '', isbn: '', availability_status: 'Available' };
+const EMPTY = { title: '', author: '', category: '', isbn: '', availability_status: 'Available' };
+const STATUS_OPTIONS = ['Available', 'Borrowed', 'Reserved', 'Retired'];
 
-export default function BookForm({ initial, onSubmit, onCancel }) {
-  const [form, setForm] = useState(empty);
-  const [errors, setErrors] = useState({});
+export default function BookForm({ initial, onSubmit, onCancel, busy }) {
+  const [form, setForm]   = useState(EMPTY);
+  const [errors, setErr]  = useState({});
 
-  useEffect(() => {
-    setForm(initial ? { ...empty, ...initial } : empty);
-    setErrors({});
-  }, [initial]);
-
-  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+  useEffect(() => { setForm(initial || EMPTY); setErr({}); }, [initial]);
 
   const validate = () => {
     const e = {};
-    if (!form.title.trim())    e.title = 'Title is required';
-    if (!form.author.trim())   e.author = 'Author is required';
+    if (!form.title.trim())    e.title    = 'Title is required';
+    if (!form.author.trim())   e.author   = 'Author is required';
     if (!form.category.trim()) e.category = 'Category is required';
-    if (!form.isbn.trim())     e.isbn = 'ISBN is required';
-    setErrors(e);
-    return Object.keys(e).length === 0;
+    if (!form.isbn.trim())     e.isbn     = 'ISBN is required';
+    return e;
   };
 
-  const submit = (e) => {
-    e.preventDefault();
-    if (validate()) onSubmit(form);
+  const submit = (ev) => {
+    ev.preventDefault();
+    const e = validate();
+    setErr(e);
+    if (!Object.keys(e).length) onSubmit(form);
   };
+
+  const update = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
   return (
-    <form onSubmit={submit}>
-      <div className="form-grid">
-        <div className="form-row">
-          <label>📖 Title</label>
-          <input className="input" value={form.title} onChange={set('title')} placeholder="The Pragmatic Programmer" />
-          {errors.title && <div className="error-text">{errors.title}</div>}
+    <form onSubmit={submit} className="space-y-4">
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div className="sm:col-span-2">
+          <label className="input-label">Title</label>
+          <input className="input" value={form.title} onChange={update('title')} />
+          {errors.title && <p className="error-text">{errors.title}</p>}
         </div>
-        <div className="form-row">
-          <label>✍️ Author</label>
-          <input className="input" value={form.author} onChange={set('author')} placeholder="Andrew Hunt" />
-          {errors.author && <div className="error-text">{errors.author}</div>}
+        <div>
+          <label className="input-label">Author</label>
+          <input className="input" value={form.author} onChange={update('author')} />
+          {errors.author && <p className="error-text">{errors.author}</p>}
         </div>
-        <div className="form-row">
-          <label>🏷️ Category</label>
-          <input className="input" value={form.category} onChange={set('category')} placeholder="Programming" />
-          {errors.category && <div className="error-text">{errors.category}</div>}
+        <div>
+          <label className="input-label">Category</label>
+          <input className="input" value={form.category} onChange={update('category')} placeholder="Fiction, Science…" />
+          {errors.category && <p className="error-text">{errors.category}</p>}
         </div>
-        <div className="form-row">
-          <label>🔢 ISBN</label>
-          <input className="input" value={form.isbn} onChange={set('isbn')} placeholder="978-..." />
-          {errors.isbn && <div className="error-text">{errors.isbn}</div>}
+        <div>
+          <label className="input-label">ISBN</label>
+          <input className="input" value={form.isbn} onChange={update('isbn')} />
+          {errors.isbn && <p className="error-text">{errors.isbn}</p>}
         </div>
-        <div className="form-row">
-          <label>📊 Status</label>
-          <select className="select" value={form.availability_status} onChange={set('availability_status')}>
-            <option value="Available">Available</option>
-            <option value="Borrowed">Borrowed</option>
+        <div>
+          <label className="input-label">Status</label>
+          <select className="select" value={form.availability_status} onChange={update('availability_status')}>
+            {STATUS_OPTIONS.map((s) => <option key={s}>{s}</option>)}
           </select>
         </div>
       </div>
-      <div className="modal-actions">
-        <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancel</button>
-        <button type="submit" className="btn btn-primary">💾 Save Book</button>
+      <div className="flex justify-end gap-2 pt-2">
+        <button type="button" onClick={onCancel} className="btn btn-secondary">Cancel</button>
+        <button type="submit" disabled={busy} className="btn btn-primary">
+          {busy ? 'Saving…' : 'Save'}
+        </button>
       </div>
     </form>
   );
